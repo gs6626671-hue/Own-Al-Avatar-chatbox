@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Perfect Shareable AI Avatar Chat (Like Google Gemini)</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: linear-gradient(to bottom, #f0f0f0, #e0e0e0);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+        .chat-container {
+            width: 400px;
+            max-width: 90%;
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        .avatar {
+            margin-bottom: 20px;
+        }
+        #avatar-img {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            border: 3px solid #007bff;
+            transition: transform 0.5s;
+        }
+        .chat-box {
+            height: 300px;
+            overflow-y: auto;
+            border: 1px solid #ccc;
+            padding: 10px;
+            margin-bottom: 10px;
+            background: #f9f9f9;
+            border-radius: 10px;
+        }
+        .message {
+            margin: 10px 0;
+            padding: 8px;
+            border-radius: 10px;
+        }
+        .user {
+            text-align: right;
+            background: #007bff;
+            color: white;
+        }
+        .bot {
+            text-align: left;
+            background: #e9ecef;
+            color: #333;
+        }
+        input, button {
+            width: calc(100% - 20px);
+            padding: 10px;
+            margin: 5px 10px;
+            border-radius: 5px;
+        }
+        input {
+            border: 1px solid #ccc;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        .loading {
+            font-style: italic;
+            color: #666;
+        }
+        .mode-toggle {
+            margin-bottom: 10px;
+        }
+        .mode-toggle button {
+            width: 48%;
+            margin: 0 1%;
+        }
+        .error {
+            color: red;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="chat-container">
+        <h1>Perfect Shareable AI Avatar Chat (Like Google Gemini)</h1>
+        <div class="mode-toggle">
+            <button id="basic-mode">Basic Mode</button>
+            <button id="ai-mode">Gemini Mode (API)</button>
+        </div>
+        <div class="avatar">
+            <img src="avatar.png" alt="AI Avatar" id="avatar-img" onerror="this.style.display='none';">
+        </div>
+        <div class="chat-box" id="chat-box">
+            <div class="message bot">Hello! Choose a mode and start chatting. This site is shareable and perfect!</div>
+        </div>
+        <input type="text" id="user-input" placeholder="Type your message...">
+        <button id="send-btn">Send</button>
+        <button id="voice-btn">Enable Voice</button>
+    </div>
+    <script>
+        const chatBox = document.getElementById('chat-box');
+        const userInput = document.getElementById('user-input');
+        const sendBtn = document.getElementById('send-btn');
+        const voiceBtn = document.getElementById('voice-btn');
+        const avatarImg = document.getElementById('avatar-img');
+        const basicBtn = document.getElementById('basic-mode');
+        const aiBtn = document.getElementById('ai-mode');
+
+        let isAIMode = false;
+        let voiceEnabled = false;
+        const apiKey = 'YOUR_GEMINI_API_KEY'; // Replace with your Google Gemini API key
+
+        // Simple responses for basic mode
+        const responses = {
+            "hello": "Hi there! How can I help?",
+            "how are you": "I'm doing great, thanks for asking!",
+            "what is your name": "I'm your AI Avatar! What's yours?",
+            "bye": "Goodbye! Come back soon.",
+            "default": "That's interesting! Tell me more."
+        };
+
+        function addMessage(text, sender, isError = false) {
+            const msgDiv = document.createElement('div');
+            msgDiv.className = `message ${sender} ${isError ? 'error' : ''}`;
+            msgDiv.textContent = text;
+            chatBox.appendChild(msgDiv);
+            chatBox.scrollTop = chatBox.scrollHeight;
+            
+            // Animate avatar on bot response (if image loads)
+            if (sender === 'bot' && avatarImg.style.display !== 'none') {
+                avatarImg.style.transform = 'scale(1.1)';
+                setTimeout(() => avatarImg.style.transform = 'scale(1)', 500);
+                if (voiceEnabled && 'speechSynthesis' in window) {
+                    speechSynthesis.speak(new SpeechSynthesisUtterance(text));
+                }
+            }
+        }
+
+        async function getGeminiResponse(userMsg) {
+            if (!apiKey || apiKey === 'YOUR_GEMINI_API_KEY') {
+                return "API key not set. Switch to Basic Mode or add a Gemini key.";
+            }
+            try {
+                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        contents: [{ parts: [{ text: userMsg }] }]
+                    })
+                });
+                if (!response.ok) throw new Error(`API error: ${response.status}`);
+                const data = await response.json();
+                if (!data.candidates || !data.candidates[0]) throw new Error('Invalid response');
+                return data.candidates[0].content.parts[0].text;
+            } catch (error) {
+                console.error('Gemini API Error:', error);
+                return "Sorry, Gemini response failed (check key/network). Switching to Basic Mode.";
+            }
+        }
+
+        async function handleSend() {
+            const userMsg = userInput.value.trim();
+            if (!userMsg) return;
+            addMessage(userMsg, 'user');
+            userInput.value = '';
+            
+            // Show loading
+            const loadingMsg = document.createElement('div');
+            loadingMsg.className = 'message bot loading';
+            loadingMsg.textContent = 'Thinking...';
+            chatBox.appendChild(loadingMsg);
+            
+            let botReply;
+            if (isAIMode) {
+                botReply = await getGeminiResponse(userMsg);
+                if (botReply.includes('failed')) {
+                    isAIMode = false; // Auto-switch to basic
+                    addMessage("Auto-switched to Basic Mode due to error.", 'bot');
+                }
+            } else {
+                botReply = responses[userMsg.toLowerCase()] || responses.default;
+            }
+            chatBox.removeChild(loadingMsg);
+            addMessage(botReply, 'bot', botReply.includes('failed'));
+        }
+
+        sendBtn.addEventListener('click', handleSend);
+        userInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') handleSend();
+        });
+
+        basicBtn.addEventListener('click', () => {
+            isAIMode = false;
+            addMessage("Switched to Basic Mode. Responses are simple and work offline.", 'bot');
+        });
+
+        aiBtn.addEventListener('click', () => {
+            isAIMode = true;
+            addMessage("Switched to Gemini Mode. Responses are generated by Google Gemini (ensure API key is set and internet is on).", 'bot');
+        });
+
+        voiceBtn.addEventListener('click', () => {
+            voiceEnabled = !voiceEnabled;
+            voiceBtn.textContent = voiceEnabled ? 'Disable Voice' : 'Enable Voice';
+            addMessage(voiceEnabled ? 'Voice enabled!' : 'Voice disabled.', 'bot');
+        });
+    </script>
+</body>
+</html>
